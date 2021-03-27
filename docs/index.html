@@ -64,20 +64,11 @@
   <div class="title">Network Architecture</div>
 
   <div class="teaser">
-    <img src="./assets/Pipeline.png"  style="width: 80%">
+    <img src="./assets/Pipeline.png"  style="width: 100%">
+    <img src="./assets/Arch2.png" style="width: 100%">
   </div>
   <div class="body">
-    SEAN generator. (A) On the left, the style encoder takes an input image and outputs a style matrix \(\mathbf{ST}\).
-    The generator on the right consists of interleaved SEAN ResBlocks and Upsampling layers. (B) A detailed view of a SEAN ResBlock used in (A).
-  </div>
-  <div class="teaser">
-    <img src="./assets/SEAN.png" style="width: 50%">
-  </div>
-  <div class="body">
-    SEAN normalization. The input are style matrix \(\mathbf{ST}\) and segmentation mask \(\mathbf{M}\).
-    In the upper part, the style codes in \(\mathbf{ST}\) undergo a per style convolution and are then broadcast to their corresponding regions according to \(\mathbf{M}\) to yield a style map.
-     The style map is processed by conv layers to produce per pixel normalization values \(\gamma^s\) and \(\beta^s\).
-     The lower part (light blue layers) creates per pixel normalization values using only the region information similar to SPADE.
+    Our unsupervised segmentation network that makes use of pretrained generators G and G_bg to simultaneously train a segmentation network A and a `weak' discriminator D, without requiring supervision for ground truth masks.
   </div>
   </div>
 </div>
