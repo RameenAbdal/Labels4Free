@@ -68,7 +68,7 @@
     <img src="./assets/Arch2.png" style="width: 100%">
   </div>
   <div class="body">
-    Our unsupervised segmentation network that makes use of pretrained generators G and G_bg to simultaneously train a segmentation network A and a `weak' discriminator D, without requiring supervision for ground truth masks.
+    Our unsupervised segmentation network that makes use of pretrained generators G and G_bg to simultaneously train a segmentation Alpha network (A) and a `weak' discriminator D, without requiring supervision for ground truth masks.
   </div>
 </div>
 <!--====== Architecture Section Ends ======-->
@@ -76,54 +76,31 @@
 
 <!--====== Results Section Starts ======-->
 <div class="container">
-  <div class="title">Results and Applications</div>
-  <div class="results">1. Image Reconstruction</div>
+  <div class="title">Results</div>
+  <div class="results">1. Face Segmentation</div>
   <div class="teaser">
-    <img src="./assets/Rec.png" style="width: 85%">
+    <img src="./assets/Face.png" style="width: 100%">
   </div>
   <div class="body">
-  Visual  comparison  of  semantic  image  synthesis  results  on  the  CelebAMask-HQ, ADE20K, CityScapes and
-  Facades dataset. We compare Pix2PixHD, SPADE, and our method.
+  Qualitative results of our unsupervised framework on StyleGAN2 trained on FFHQ compared with BiSeNet trained on CelebA-HQ Masks. Note that the green and red areas are the `False Positives' and  `False Negatives' with respect to the foreground in ground truth.  We report our results on two truncation levels.
   </div>
 
-  <div class="results">2. Image Editing</div>
+  <div class="results">2. LSUN-Objects Segmentation</div>
   <div class="teaser">
-    <img src="./assets/Image_editing.png" style="width: 85%">
+    <img src="./assets/LSUN.png" style="width: 100%">
   </div>
   <div class="body">
-  Editing sequence on the ADE20K dataset.  (a) source image, (b) reconstruction of the source image,
-  (c-f) variousedits using style images shown in the top row. The regions affected by the edits are shown as small insets.
+  Qualitative results of our unsupervised framework on StyleGAN2 trained on LSUN-Horse, LSUN-Cat and LSUN-Car (LSUN-Object) compared with Detectron 2 trained on MS-COCO. Note that the green and red areas are the `False Positives' and  `False Negatives' with respect to the foreground in ground truth.
   </div>
 
 
-  <div class="results">3. Style Transfer</div>
+  <div class="results">3. Image Editing</div>
   <div class="teaser">
-    <img src="./assets/Style_transfer.png" style="width: 85%">
+    <img src="./assets/Styleflow.png" style="width: 85%">
   </div>
   <div class="body">
-  Style transfer on CelebAMask-HQ dataset.
+  Our method achieves better background preservation compared to original semantic edits in StyleFlow. For the real image, we first obtain a background layer, segmented using Label4Free and then completed using ContentAwareFill, and then for each edit using StyleFlow, we again segment them using our method and then composite back with the completed background layer (obtained above). Please compare the first row versus third rows.
   </div>
-
-  <div class="results">4. Style interpolation & Style Crossover</div>
-  <div class="teaser">
-    <img src="./assets/Interpolation.jpg" style="width: 85%">
-  </div>
-  <div class="body">
-  Style interpolation.  We take a mask from a source image and reconstruct with two different style images (Style1and Style2)
-   that are very different from the source image. We then show interpolated results of the per-region style codes.
-  </div>
-  <div class="teaser">
-    <img src="./assets/crossover.jpg" style="width: 85%">
-  </div>
-  <div class="body">
-  Style crossover.  In addition to style interpolation (bottom row), we can perform crossover by selecting differentstyles per ResBlk. We show two transitions in the top two rows.
-   The blue / orange bars on top of the images indicate whichstyles are used by the six ResBlks.
-   We can observe that earlier layers are responsible for larger features and later layersmainly determine the color scheme.
-  </div>
-
-
-
-
 </div>
 <!--====== Results Section Ends ======-->
 
@@ -132,14 +109,7 @@
 <div class="container">
   <div class="bibtex">Bibtex</div>
 <pre>
-  @misc{zhu2019sean,
-    title={SEAN: Image Synthesis with Semantic Region-Adaptive Normalization},
-    author={Peihao Zhu and Rameen Abdal and Yipeng Qin and Peter Wonka},
-    year={2019},
-    eprint={1911.12861},
-    archivePrefix={arXiv},
-    primaryClass={cs.CV}
-}
+
 </pre>
 </div>
 
@@ -150,7 +120,7 @@
 <div class="container">
   <div class="acknowledgement">Acknowledgement</div>
   <div class="body" style="font-size: 11pt;;">
-    We thank Wamiq Reyaz Para for helpful comments. This  work  was  supported  by  the KAUST Office of Sponsored Research (OSR) under AwardNo. OSR-CRG2018-3730.
+    This work was supported by the KAUST Office of Sponsored Research (OSR) under Award No. OSR-CRG2017-3426.
   </div>
 
 </div>
