@@ -1,8 +1,8 @@
-@misc{zhu2019sean,
-    title={SEAN: Image Synthesis with Semantic Region-Adaptive Normalization},
-    author={Peihao Zhu and Rameen Abdal and Yipeng Qin and Peter Wonka},
-    year={2019},
-    eprint={1911.12861},
+@misc{abdal2021labels4free,
+    title={Labels4Free: Unsupervised Segmentation using StyleGAN},
+    author={Rameen Abdal and Peihao Zhu and Niloy Mitra and Peter Wonka},
+    year={2021},
+    eprint={2103.14968},
     archivePrefix={arXiv},
     primaryClass={cs.CV}
 }
