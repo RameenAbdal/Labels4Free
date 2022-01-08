@@ -87,7 +87,7 @@ python test_sample.py --size [SIZE] --batch 2 --n_sample 100 --ckpt_bg_extractor
 
 [Folder](./custom_dataset): Custom dataset, predicted and ground truth masks.
 ``` bash
-python test_customdata.py --path_gt [GT_Folder] --path_pred {PRED_FOLDER}
+python test_customdata.py --path_gt [GT_Folder] --path_pred [PRED_FOLDER]
 ```
 ## Citation
 
