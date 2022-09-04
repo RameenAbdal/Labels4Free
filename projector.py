@@ -10,7 +10,7 @@ from PIL import Image
 from tqdm import tqdm
 
 import lpips
-from model import Generator
+from model_new import Generator
 
 
 def noise_regularize(noises):

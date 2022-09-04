@@ -8,7 +8,10 @@ import torch
 import numpy as np
 from torchvision import utils
 
-from model import Generator, Discriminator
+from model_new import Generator, Discriminator
+
+import dnnlib
+from dnnlib import tflib
 
 
 def convert_modconv(vars, source_name, target_name, flip=False):
@@ -228,8 +231,7 @@ if __name__ == "__main__":
 
     sys.path.append(args.repo)
     print(sys.path)
-    import dnnlib
-    from dnnlib import tflib
+    
 
     tflib.init_tf()
 

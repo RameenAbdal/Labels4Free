@@ -2,7 +2,7 @@ import argparse
 
 import torch
 from torchvision import utils
-from model import Generator
+from model_new import Generator
 from tqdm import tqdm
 
 

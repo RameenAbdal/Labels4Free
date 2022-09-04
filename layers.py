@@ -19,8 +19,8 @@ try:
 except ImportError:
     wandb = None
 
-from model import Discriminator, MaskLoss
-from model import Generator_next as Generator
+from model_new import Discriminator, MaskLoss
+from model_new import Generator_next as Generator
 from dataset import MultiResolutionDataset
 from distributed import (
     get_rank,
@@ -551,7 +551,7 @@ if __name__ == "__main__":
     g_ema_bg.eval()
     accumulate(g_ema_bg, generator_bg, 0)
 
-    from model import bg_extractor
+    from model_new import bg_extractor
 
     sample_z = torch.randn(args.n_sample, args.latent, device=device)
     sample_z2 = torch.randn(args.n_sample, args.latent, device=device)
