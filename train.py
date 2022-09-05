@@ -31,6 +31,13 @@ from non_leaking import augment, AdaptiveAugment
 
 
 def data_sampler(dataset, shuffle, distributed):
+    """Returns a data sampler for a dataloader.
+
+    Args:
+        dataset (torch.utils.data.Dataset): a dataset class as an input to a model.
+        shuffle (bool): whether to shuffle indices for a dataloading.
+        distributed (bool): whether to use distributed sampler (multi-gpu training)
+    """
     if distributed:
         return data.distributed.DistributedSampler(dataset, shuffle=shuffle)
 
@@ -51,8 +58,10 @@ def accumulate(model1, model2, decay=0.999):
     par2 = dict(model2.named_parameters())
 
     for k in par1.keys():
+        """parameter를 이런 식으로 해주는 건 대체 어디서 나온 걸까? -> 뒤에 이 함수 참조한 코드 보기"""
         par1[k].data.mul_(decay).add_(par2[k].data, alpha=1 - decay)
 
+# regularization 부분은 PertSeg paper에서 따온 아이디어였음.
 def binarization_loss(mask):
     "Refer to PertSeg paper"
     return  torch.min(1-mask, mask).mean()
@@ -72,13 +81,20 @@ def sample_data(loader):
 
 
 def d_logistic_loss(real_pred, fake_pred):
-    real_loss = F.softplus(-real_pred)
+    """
+    softplus를 loss함수로 쓴다..?? 신기하군
+    real pred는 왜 -로 집어넣는 거지?
+    """
+    real_loss = F.softplus(-real_pred) # SoftPlus is a smooth approximation to the ReLU function and can be used to constrain the output of a machine to always be positive.
     fake_loss = F.softplus(fake_pred)
 
     return real_loss.mean() + fake_loss.mean()
 
 
 def d_r1_loss(real_pred, real_img):
+    """
+    이 loss는 어디서 쓰는 거지?
+    """
     grad_real, = autograd.grad(
         outputs=real_pred.sum(), inputs=real_img, create_graph=True
     )
@@ -87,7 +103,7 @@ def d_r1_loss(real_pred, real_img):
     return grad_penalty
 
 
-def g_nonsaturating_loss(fake_pred):
+def g_nonsaturating_loss(fake_pred): # 왜 애초에 nonsaturaing loss를 쓰는 거지?
     loss = F.softplus(-fake_pred).mean()
 
     return loss
@@ -97,7 +113,7 @@ def make_noise(batch, latent_dim, n_noise, device):
     if n_noise == 1:
         return torch.randn(batch, latent_dim, device=device)
 
-    noises = torch.randn(n_noise, batch, latent_dim, device=device).unbind(0)
+    noises = torch.randn(n_noise, batch, latent_dim, device=device).unbind(0) # unbind?
 
     return noises
 
@@ -110,13 +126,20 @@ def mixing_noise(batch, latent_dim, prob, device):
         return [make_noise(batch, latent_dim, 1, device)]
 
 
-def set_grad_none(model, targets):
+def set_grad_none(model, targets): # 특정 parameter만 grad를 none으로
     for n, p in model.named_parameters():
         if n in targets:
             p.grad = None
 
 
 def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim, ema_bg, device, mean_latent):
+    """
+    Train a model
+
+    Args:
+        ema_bg (_type_): _description_
+        mean_latent (_type_): _description_
+    """
     loader = sample_data(loader)
 
     pbar = range(args.iter + 1)
@@ -133,7 +156,7 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
     if args.distributed:
         g_module = generator.module
         d_module = discriminator.module
-        bg_extractor_ema = bg_extractor.module
+        bg_extractor_ema = bg_extractor.module # ema?
 
     else:
         g_module = generator
@@ -141,7 +164,7 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
         bg_extractor_ema = bg_extractor
 
     accum = 0.5 ** (32 / (10 * 1000))
-    ada_aug_p = args.augment_p if args.augment_p > 0 else 0.0
+    ada_aug_p = args.augment_p if args.augment_p > 0 else 0.0 # ada를 위한 augmentation probability setting
 
     if args.augment and args.augment_p == 0:
         ada_augment = AdaptiveAugment(args.ada_target, args.ada_length, 256, device)

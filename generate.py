@@ -1,3 +1,6 @@
+"""
+generate.py -> generator로부터 이미지 만들어서 저장
+"""
 import argparse
 
 import torch
@@ -7,7 +10,7 @@ from tqdm import tqdm
 
 
 def generate(args, g_ema, device, mean_latent):
-
+    """왜 g_ema라고 칭하는 거지..???"""
     with torch.no_grad():
         g_ema.eval()
         for i in tqdm(range(args.pics)):

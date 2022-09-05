@@ -18,11 +18,11 @@ class PixelNorm(nn.Module):
         super().__init__()
 
     def forward(self, input):
-        return input * torch.rsqrt(torch.mean(input ** 2, dim=1, keepdim=True) + 1e-8)
+        return input * torch.rsqrt(torch.mean(input ** 2, dim=1, keepdim=True) + 1e-8) # torch.rsqrt -> 1/sqrt 리턴 (element-wise operation)
 
 
 def make_kernel(k):
-    k = torch.tensor(k, dtype=torch.float32)
+    k = torch.tensor(k, dtype=torch.float32) # 이 k가 뭔데..?
 
     if k.ndim == 1:
         k = k[None, :] * k[:, None]
