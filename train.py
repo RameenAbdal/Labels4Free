@@ -163,7 +163,7 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
         d_module = discriminator
         bg_extractor_ema = bg_extractor
 
-    accum = 0.5 ** (32 / (10 * 1000))
+    accum = 0.5 ** (32 / (10 * 1000)) # accum은 ema를 위한 accum
     ada_aug_p = args.augment_p if args.augment_p > 0 else 0.0 # ada를 위한 augmentation probability setting
 
     if args.augment and args.augment_p == 0:
@@ -180,6 +180,7 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
         real_img = next(loader)
         real_img = real_img.to(device)
 
+        # gradient freeze
         requires_grad(generator, False)
         requires_grad(bg_extractor, False)
         requires_grad(discriminator, True)
@@ -187,14 +188,14 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
         noise = mixing_noise(args.batch, args.latent, args.mixing, device)
         
 
-        with torch.no_grad():
+        with torch.no_grad(): # torch no grad는 freeze니까
             fake_img, _ = generator(noise, back = False, truncation=args.trunc, truncation_latent=mean_latent)
             fake_img2, x = generator(noise, back = True)
 
-        alpha_mask = bg_extractor(_)
+        alpha_mask = bg_extractor(_) # list 집어넣기 (근데 왜 변수할당 안하고 이렇게 하는지 잘 모르겠음)
 
 
-        if args.augment:
+        if args.augment: # augmentation 진행
             real_img_aug, _ = augment(real_img, ada_aug_p)
             fake_img, _ = augment(fake_img, ada_aug_p)
 

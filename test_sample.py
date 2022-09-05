@@ -59,8 +59,8 @@ if __name__ == "__main__":
   
     args = parser.parse_args()
 
-    args.latent = 512
-    args.n_mlp = 8
+    args.latent = 512 # latent dimension
+    args.n_mlp = 8 # 아마 w code generate하는 거일 듯? 이 w code가 style code 같음.
 
     generator = Generator(
         args.size, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier
@@ -71,12 +71,15 @@ if __name__ == "__main__":
         args.size, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier
     ).to(device)
     g_ema.eval()
-    accumulate(g_ema, generator, 0)
-    
-    min_res = {1024: 32, 512: 16, 256: 8}
+    accumulate(g_ema, generator, 0) # generator의 가중치를 애초에 ema 해버리는 듯?
+    # 0 -> decay factor
+    # 현재의 generator에만 의존하지 않기 위해 ema를 취하는 것 같다.
+
+    min_res = {1024: 32, 512: 16, 256: 8} # input resolution에 따른 minimum output resolution을 매핑해주는 dictionary
 
     bg_extractor_ = bg_extractor_repro(image_size = args.size, min_res = min_res[args.size]).to(device)
 
+    # checkpoint loading
     if args.ckpt_generator and args.ckpt_bg_extractor is not None:
         print("load bg extractor model:", args.ckpt_bg_extractor)
         print("load generator model:", args.ckpt_generator)
@@ -97,7 +100,7 @@ if __name__ == "__main__":
         
     
     with torch.no_grad():
-        mean_latent = g_ema.mean_latent(4096)
+        mean_latent = g_ema.mean_latent(4096) # truncation trick 정의하려고 mean_latent 구하는 것.
     
     with tqdm(range(args.n_sample)) as pbar:
      for i in pbar:
@@ -106,12 +109,12 @@ if __name__ == "__main__":
         sample_z2 = torch.randn(args.batch, args.latent, device=device)
 
 
-        sample, _ = g_ema([sample_z], truncation=0.5, truncation_latent=mean_latent, back = False)
+        sample, _ = g_ema([sample_z], truncation=0.5, truncation_latent=mean_latent, back = False) # back이 뭐지?
         sample_bg, __ = g_ema([sample_z2], truncation=0.5, truncation_latent=mean_latent, back = True)
               
-        alpha_mask = bg_extractor_(_)
+        alpha_mask = bg_extractor_(_) # _: 저렇게도 들어가나 list가..?
 
-        hard_mask = (alpha_mask > args.th).float()
+        hard_mask = (alpha_mask > args.th).float() # binary mask로 변환
 
         image_new = sample * alpha_mask + (1 - alpha_mask) * sample_bg
 
