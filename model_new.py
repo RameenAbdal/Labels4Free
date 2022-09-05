@@ -1,13 +1,9 @@
 import math
 import random
-import functools
-import operator
-from typing import OrderedDict
 
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.autograd import Function
 
 from op import FusedLeakyReLU, fused_leaky_relu, upfirdn2d
 import math
