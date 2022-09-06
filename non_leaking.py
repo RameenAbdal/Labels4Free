@@ -1,3 +1,6 @@
+"""
+non_leaking.py → ADA 구현을 위한 py파일
+"""
 import math
 
 import torch
@@ -8,9 +11,12 @@ from op import upfirdn2d
 
 
 class AdaptiveAugment:
+    """
+    
+    """
     def __init__(self, ada_aug_target, ada_aug_len, update_every, device):
-        self.ada_aug_target = ada_aug_target
-        self.ada_aug_len = ada_aug_len
+        self.ada_aug_target = ada_aug_target # target과 같은 경우에는 r_t를 p에 반영하는 과정에서 thresholding하는 느낌..?
+        self.ada_aug_len = ada_aug_len 
         self.update_every = update_every
 
         self.ada_aug_buf = torch.tensor([0.0, 0.0], device=device)
@@ -22,13 +28,13 @@ class AdaptiveAugment:
         ada_aug_data = torch.tensor(
             (torch.sign(real_pred).sum().item(), real_pred.shape[0]),
             device=real_pred.device,
-        )
-        self.ada_aug_buf += reduce_sum(ada_aug_data)
+        ) # 진짜 pred_sign이랑 n_pred를 나눠서 해뒀군.
+        self.ada_aug_buf += reduce_sum(ada_aug_data) # device 간 reduce를 해주는 게 중요한가봄. (device 별로 연산을 취하면 안되나보다)
 
         if self.ada_aug_buf[1] > self.update_every - 1:
             pred_signs, n_pred = self.ada_aug_buf.tolist()
 
-            self.r_t_stat = pred_signs / n_pred
+            self.r_t_stat = pred_signs / n_pred # r_t stat 계산
 
             if self.r_t_stat > self.ada_aug_target:
                 sign = 1
@@ -36,9 +42,9 @@ class AdaptiveAugment:
             else:
                 sign = -1
 
-            self.ada_aug_p += sign * n_pred / self.ada_aug_len
+            self.ada_aug_p += sign * n_pred / self.ada_aug_len # 여기는 정확히 왜 이렇게 operating되는지 모르겠긴 함..
             self.ada_aug_p = min(1, max(0, self.ada_aug_p))
-            self.ada_aug_buf.mul_(0)
+            self.ada_aug_buf.mul_(0) # buffer값에 0을 곱해줌. 즉, buffer flushing.
 
         return self.ada_aug_p
 

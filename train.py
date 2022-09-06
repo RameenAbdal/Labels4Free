@@ -31,6 +31,13 @@ from non_leaking import augment, AdaptiveAugment
 
 
 def data_sampler(dataset, shuffle, distributed):
+    """Returns a data sampler for a dataloader.
+
+    Args:
+        dataset (torch.utils.data.Dataset): a dataset class as an input to a model.
+        shuffle (bool): whether to shuffle indices for a dataloading.
+        distributed (bool): whether to use distributed sampler (multi-gpu training)
+    """
     if distributed:
         return data.distributed.DistributedSampler(dataset, shuffle=shuffle)
 
@@ -51,8 +58,10 @@ def accumulate(model1, model2, decay=0.999):
     par2 = dict(model2.named_parameters())
 
     for k in par1.keys():
+        """parameter를 이런 식으로 해주는 건 대체 어디서 나온 걸까? -> weight ema"""
         par1[k].data.mul_(decay).add_(par2[k].data, alpha=1 - decay)
 
+# regularization 부분은 PertSeg paper에서 따온 아이디어였음.
 def binarization_loss(mask):
     "Refer to PertSeg paper"
     return  torch.min(1-mask, mask).mean()
@@ -72,13 +81,20 @@ def sample_data(loader):
 
 
 def d_logistic_loss(real_pred, fake_pred):
-    real_loss = F.softplus(-real_pred)
+    """
+    softplus를 loss함수로 쓴다..?? 신기하군
+    real pred는 왜 -로 집어넣는 거지?
+    """
+    real_loss = F.softplus(-real_pred) # SoftPlus is a smooth approximation to the ReLU function and can be used to constrain the output of a machine to always be positive.
     fake_loss = F.softplus(fake_pred)
 
     return real_loss.mean() + fake_loss.mean()
 
 
 def d_r1_loss(real_pred, real_img):
+    """
+    이 loss는 어디서 쓰는 거지?
+    """
     grad_real, = autograd.grad(
         outputs=real_pred.sum(), inputs=real_img, create_graph=True
     )
@@ -87,7 +103,7 @@ def d_r1_loss(real_pred, real_img):
     return grad_penalty
 
 
-def g_nonsaturating_loss(fake_pred):
+def g_nonsaturating_loss(fake_pred): # 왜 애초에 nonsaturaing loss를 쓰는 거지?
     loss = F.softplus(-fake_pred).mean()
 
     return loss
@@ -97,7 +113,7 @@ def make_noise(batch, latent_dim, n_noise, device):
     if n_noise == 1:
         return torch.randn(batch, latent_dim, device=device)
 
-    noises = torch.randn(n_noise, batch, latent_dim, device=device).unbind(0)
+    noises = torch.randn(n_noise, batch, latent_dim, device=device).unbind(0) # unbind?
 
     return noises
 
@@ -110,13 +126,24 @@ def mixing_noise(batch, latent_dim, prob, device):
         return [make_noise(batch, latent_dim, 1, device)]
 
 
-def set_grad_none(model, targets):
+def set_grad_none(model, targets): # 특정 parameter만 grad를 none으로
     for n, p in model.named_parameters():
         if n in targets:
             p.grad = None
 
+def expand_path(path):
+    os.makedirs(path, exist_ok=True)
+    return path
+
 
 def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim, ema_bg, device, mean_latent):
+    """
+    Train a model
+
+    Args:
+        ema_bg (_type_): _description_
+        mean_latent (_type_): _description_
+    """
     loader = sample_data(loader)
 
     pbar = range(args.iter + 1)
@@ -133,15 +160,15 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
     if args.distributed:
         g_module = generator.module
         d_module = discriminator.module
-        bg_extractor_ema = bg_extractor.module
+        bg_extractor_ema = bg_extractor.module # ema?
 
     else:
         g_module = generator
         d_module = discriminator
         bg_extractor_ema = bg_extractor
 
-    accum = 0.5 ** (32 / (10 * 1000))
-    ada_aug_p = args.augment_p if args.augment_p > 0 else 0.0
+    accum = 0.5 ** (32 / (10 * 1000)) # accum은 ema를 위한 accum
+    ada_aug_p = args.augment_p if args.augment_p > 0 else 0.0 # ada를 위한 augmentation probability setting
 
     if args.augment and args.augment_p == 0:
         ada_augment = AdaptiveAugment(args.ada_target, args.ada_length, 256, device)
@@ -157,6 +184,7 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
         real_img = next(loader)
         real_img = real_img.to(device)
 
+        # gradient freeze
         requires_grad(generator, False)
         requires_grad(bg_extractor, False)
         requires_grad(discriminator, True)
@@ -164,14 +192,14 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
         noise = mixing_noise(args.batch, args.latent, args.mixing, device)
         
 
-        with torch.no_grad():
+        with torch.no_grad(): # torch no grad는 freeze니까
             fake_img, _ = generator(noise, back = False, truncation=args.trunc, truncation_latent=mean_latent)
             fake_img2, x = generator(noise, back = True)
 
-        alpha_mask = bg_extractor(_)
+        alpha_mask = bg_extractor(_) # list 집어넣기 (근데 왜 변수할당 안하고 이렇게 하는지 잘 모르겠음)
 
 
-        if args.augment:
+        if args.augment: # augmentation 진행
             real_img_aug, _ = augment(real_img, ada_aug_p)
             fake_img, _ = augment(fake_img, ada_aug_p)
 
@@ -219,7 +247,6 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
     
         with torch.no_grad():
          fake_img, _ = generator(noise, back=False, truncation=args.trunc, truncation_latent=mean_latent)
- 
          fake_img2, x = generator(noise,  back=True)
 
         alpha_mask = bg_extractor(_)
@@ -279,7 +306,7 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
                         f"sample/{str(i).zfill(6)}_composite.png",
                         nrow=int(args.n_sample ** 0.5),
                         normalize=True,
-                        range=(-1, 1),
+                        value_range=(-1, 1),
                     )
                     utils.save_image(
                         alpha_mask,
@@ -293,14 +320,14 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
                         f"sample/{str(i).zfill(6)}_original.png",
                         nrow=int(args.n_sample ** 0.5),
                         normalize=True,
-                        range=(-1, 1),
+                        value_range=(-1, 1),
                     )
                     utils.save_image(
                         sample_bg,
                         f"sample/{str(i).zfill(6)}_background.png",
                         nrow=int(args.n_sample ** 0.5),
                         normalize=True,
-                        range=(-1, 1),
+                        value_range=(-1, 1),
                     )
 
                 
@@ -347,6 +374,9 @@ if __name__ == "__main__":
         "--use_disc", action="store_true", help="use pretrained discriminator"
     )
     parser.add_argument(
+        "--pretrained_alphanet", action="store_true", help="use pretrained alpha network"
+    )
+    parser.add_argument(
         "--r1", type=float, default=10, help="weight of the r1 regularization"
     )
     parser.add_argument(
@@ -390,7 +420,7 @@ if __name__ == "__main__":
         "--ckpt",
         type=str,
         default=None,
-        help="path to the checkpoints to resume training",
+        help="path to the checkpoints to resume training (checkpoints should be in the format of pytorch)",
     )
     parser.add_argument("--lr", type=float, default=0.0002, help="learning rate")
     parser.add_argument(
@@ -503,12 +533,27 @@ if __name__ == "__main__":
 
         except ValueError:
             pass
+        
+        try:
+            generator.load_state_dict(ckpt['g_ema'])
+            g_ema.load_state_dict(ckpt['g_ema'])
+        
+        except:
+            generator.load_state_dict(ckpt['g'])
+            g_ema.load_state_dict(ckpt['g'])
+        
+        print("Generator Loaded.")
 
-        generator.load_state_dict(ckpt['g_ema'])
-        g_ema.load_state_dict(ckpt['g_ema'])
-        if args.use_disc: 
-           
+        if args.use_disc:   
             discriminator.load_state_dict(ckpt['d'])
+            print("Discriminator Loaded.")
+
+        if args.pretrained_alphanet:
+            alphanet_model.load_state_dict(ckpt['bg_extractor_ema'])
+            ema_bg.load_state_dict(ckpt['bg_extractor_ema'])
+            print("AlphaNet Loaded.")
+        
+        print("Model successfully loaded!")
        
 
     with torch.no_grad():
@@ -540,21 +585,26 @@ if __name__ == "__main__":
         )
 
     transform = transforms.Compose(
-        [
+        [   
+            transforms.Resize((args.size, args.size)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True),
         ]
     )
+    print("Building Dataset...")
     dataset = MultiResolutionDataset(args.path, transform, args.size)
+    print("Dataset Built!")
+
     loader = data.DataLoader(
         dataset,
         batch_size=args.batch,
         sampler=data_sampler(dataset, shuffle=True, distributed=args.distributed),
         drop_last=True,
+        pin_memory=True
     )
 
     if get_rank() == 0 and wandb is not None and args.wandb:
-        wandb.init(project="stylegan 2")
+        wandb.init(project="labels4free", name=args.run_name, entity="yoojlee", config=vars(args))
 
     train(args, loader, generator, alphanet_model, discriminator, g_optim, d_optim, ema_bg, device, mean_latent)

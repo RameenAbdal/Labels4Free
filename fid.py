@@ -15,6 +15,20 @@ from calc_inception import load_patched_inception_v3
 def extract_feature_from_samples(
     generator, inception, truncation, truncation_latent, batch_size, n_sample, device
 ):
+    """fid 계산을 위한 feature extraction (일단 generator 코드 보고 다시)
+
+    Args:
+        generator (Generator): Generator (foreground? background?)
+        inception (Inception): Inception module for feature extraction
+        truncation (_type_): _description_
+        truncation_latent (_type_): _description_ -> ?
+        batch_size (_type_): _description_
+        n_sample (_type_): _description_
+        device (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     n_batch = n_sample // batch_size
     resid = n_sample - (n_batch * batch_size)
     batch_sizes = [batch_size] * n_batch + [resid]
@@ -22,7 +36,7 @@ def extract_feature_from_samples(
 
     for batch in tqdm(batch_sizes):
         latent = torch.randn(batch, 512, device=device)
-        img, _ = g([latent], truncation=truncation, truncation_latent=truncation_latent)
+        img, _ = generator([latent], truncation=truncation, truncation_latent=truncation_latent)
         feat = inception(img)[0].view(img.shape[0], -1)
         features.append(feat.to("cpu"))
 

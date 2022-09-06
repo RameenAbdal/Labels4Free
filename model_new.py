@@ -1,13 +1,9 @@
 import math
 import random
-import functools
-import operator
-from typing import OrderedDict
 
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.autograd import Function
 
 from op import FusedLeakyReLU, fused_leaky_relu, upfirdn2d
 import math
@@ -18,11 +14,11 @@ class PixelNorm(nn.Module):
         super().__init__()
 
     def forward(self, input):
-        return input * torch.rsqrt(torch.mean(input ** 2, dim=1, keepdim=True) + 1e-8)
+        return input * torch.rsqrt(torch.mean(input ** 2, dim=1, keepdim=True) + 1e-8) # torch.rsqrt -> 1/sqrt 리턴 (element-wise operation)
 
 
-def make_kernel(k):
-    k = torch.tensor(k, dtype=torch.float32)
+def make_kernel(k): # 이 커널을 왜 만드는 건데?
+    k = torch.tensor(k, dtype=torch.float32) # 이 k가 뭔데..?
 
     if k.ndim == 1:
         k = k[None, :] * k[:, None]
@@ -38,7 +34,14 @@ class Upsample(nn.Module):
 
         self.factor = factor
         kernel = make_kernel(kernel) * (factor ** 2)
-        self.register_buffer("kernel", kernel)
+        self.register_buffer("kernel", kernel) # kernel을 update하지 않는 일반 레이어를 넣고 싶을 때 사용할 수 있음. 
+        # (다만, gradient computational graph에는 추가가 안되는 듯. 중간에 끊기지 않고 학습할 수 있다는 장점이 있는 듯함.)
+        
+        # register_buffer로 layer를 등록하는 경우
+        # 1. optimizer가 업데이트하지 않음
+        # 2. 그러나 값은 존재함 (layer로서 operation은 충분히 수행)
+        # 3. state_dict()로 확인 가능함.
+        # 4. GPU 연산이 가능함.
 
         p = kernel.shape[0] - factor
 
@@ -75,6 +78,9 @@ class Downsample(nn.Module):
 
 
 class Blur(nn.Module):
+    """
+    for antialiasing (https://arxiv.org/pdf/1904.11486.pdf)
+    """
     def __init__(self, kernel, pad, upsample_factor=1):
         super().__init__()
 
@@ -88,7 +94,7 @@ class Blur(nn.Module):
         self.pad = pad
 
     def forward(self, input):
-        out = upfirdn2d(input, self.kernel, pad=self.pad)
+        out = upfirdn2d(input, self.kernel, pad=self.pad) # 설정해놓은 레이어를 더 자세히 뜯어봐야겠다.
 
         return out
 
@@ -97,18 +103,21 @@ class EqualConv2d(nn.Module):
     def __init__(
         self, in_channel, out_channel, kernel_size, stride=1, padding=0, bias=True
     ):
+        """
+        Equal? input resolution과 output resolution의 equality를 항상 보장해주는 건가?
+        """
         super().__init__()
 
         self.weight = nn.Parameter(
-            torch.randn(out_channel, in_channel, kernel_size, kernel_size)
-        )
-        self.scale = 1 / math.sqrt(in_channel * kernel_size ** 2)
+            torch.randn(out_channel, in_channel, kernel_size, kernel_size) 
+        ) # weight initialization
+        self.scale = 1 / math.sqrt(in_channel * kernel_size ** 2) # weight scaling factor
 
         self.stride = stride
         self.padding = padding
 
         if bias:
-            self.bias = nn.Parameter(torch.zeros(out_channel))
+            self.bias = nn.Parameter(torch.zeros(out_channel)) # bias init
 
         else:
             self.bias = None
@@ -120,7 +129,7 @@ class EqualConv2d(nn.Module):
             bias=self.bias,
             stride=self.stride,
             padding=self.padding,
-        )
+        ) # weight을 저런 식으로 scale을 걸어주는 건 처음 보는 듯 + 지속적으로 scaling이 들어감 (re-scaling)
 
         return out
 
@@ -137,7 +146,7 @@ class EqualLinear(nn.Module):
     ):
         super().__init__()
 
-        self.weight = nn.Parameter(torch.randn(out_dim, in_dim).div_(lr_mul))
+        self.weight = nn.Parameter(torch.randn(out_dim, in_dim).div_(lr_mul)) # 뭔가 computation때문에 여기서 lr_mul 나눠주고
 
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_dim).fill_(bias_init))
@@ -147,13 +156,13 @@ class EqualLinear(nn.Module):
 
         self.activation = activation
 
-        self.scale = (1 / math.sqrt(in_dim)) * lr_mul
+        self.scale = (1 / math.sqrt(in_dim)) * lr_mul # self.scale에서 다시 곱해주는 거 같은데..? 흠
         self.lr_mul = lr_mul
 
     def forward(self, input):
         if self.activation:
-            out = F.linear(input, self.weight * self.scale)
-            out = fused_leaky_relu(out, self.bias * self.lr_mul)
+            out = F.linear(input, self.weight * self.scale) # 다시 rescaling (근데 이걸 굳이 "Equal"이라고 표기한 데에는 이유가 뭘까..?)
+            out = fused_leaky_relu(out, self.bias * self.lr_mul) # fused_leaky_relu 알아보기
 
         else:
             out = F.linear(
@@ -180,6 +189,9 @@ class ModulatedConv2d(nn.Module):
         downsample=False,
         blur_kernel=[1, 3, 3, 1],
     ):
+        """
+        upsample과 downsample이 둘 다 들어있는 거 보니까 Generator와 Discriminator 둘 다에서 범용적으로 사용되는 것 같다.
+        """
         super().__init__()
 
         self.eps = 1e-8
@@ -195,7 +207,7 @@ class ModulatedConv2d(nn.Module):
             pad0 = (p + 1) // 2 + factor - 1
             pad1 = p // 2 + 1
 
-            self.blur = Blur(blur_kernel, pad=(pad0, pad1), upsample_factor=factor)
+            self.blur = Blur(blur_kernel, pad=(pad0, pad1), upsample_factor=factor) # for anti-aliasing
 
         if downsample:
             factor = 2
@@ -226,11 +238,12 @@ class ModulatedConv2d(nn.Module):
     def forward(self, input, style, mod = False):
         batch, in_channel, height, width = input.shape
 
-        style = self.modulation(style).view(batch, 1, in_channel, 1, 1)
+        # self-modulation
+        style = self.modulation(style).view(batch, 1, in_channel, 1, 1) # style을 equallinear layer에 태우는 게 modulated convolution이군 (이건 styleGAN thing인 듯)
 
         weight = self.scale * self.weight * style
 
-        if self.demodulate:
+        if self.demodulate: # modulation을 해제하는 거 같은데 -> 이 경우에는 weight을 rescaling하는 걸로 구현하는 듯?
             demod = torch.rsqrt(weight.pow(2).sum([2, 3, 4]) + 1e-8)
             weight = weight * demod.view(batch, self.out_channel, 1, 1, 1)
 
@@ -286,7 +299,7 @@ class ConstantInput(nn.Module):
     def __init__(self, channel, size=4):
         super().__init__()
 
-        self.input = nn.Parameter(torch.randn(1, channel, size, size))
+        self.input = nn.Parameter(torch.randn(1, channel, size, size)) # learnable parameter로 register. ViT에서 class token처럼.
 
     def forward(self, input):
         batch = input.shape[0]
@@ -316,7 +329,7 @@ class StyledConv(nn.Module):
             upsample=upsample,
             blur_kernel=blur_kernel,
             demodulate=demodulate,
-        )
+        ) # styledConv에 들어가는 게 ModulatedConv2d
 
         self.noise = NoiseInjection()
         # self.bias = nn.Parameter(torch.zeros(1, out_channel, 1, 1))
@@ -339,7 +352,7 @@ class ToRGB(nn.Module):
         if upsample:
             self.upsample = Upsample(blur_kernel)
 
-        self.conv = ModulatedConv2d(in_channel, 3, 1, style_dim, demodulate=False)
+        self.conv = ModulatedConv2d(in_channel, 3, 1, style_dim, demodulate=False) # RGB 채널로 변환하는 것.
         self.bias = nn.Parameter(torch.zeros(1, 3, 1, 1))
 
     def forward(self, input, style, skip=None):
@@ -372,6 +385,8 @@ class Generator(nn.Module):
 
         layers = [PixelNorm()]
 
+
+        # Style Generation
         for i in range(n_mlp):
             layers.append(
                 EqualLinear(
@@ -379,7 +394,7 @@ class Generator(nn.Module):
                 )
             )
 
-        self.style = nn.Sequential(*layers)
+        self.style = nn.Sequential(*layers) # style code generation하는 부분 (w code로 mapping하는 과정)
 
         self.channels = {
             4: 512,
@@ -458,8 +473,8 @@ class Generator(nn.Module):
     def mean_latent(self, n_latent):
         latent_in = torch.randn(
             n_latent, self.style_dim, device=self.input.input.device
-        )
-        latent = self.style(latent_in).mean(0, keepdim=True)
+        ) # random noise로부터 시작하는데 (batch_dim, n_latent, self.style_dim) 크기
+        latent = self.style(latent_in).mean(0, keepdim=True) # w code generation하고 w code에 mean 적용.
 
         return latent
 
@@ -494,7 +509,7 @@ class Generator(nn.Module):
 
             for style in styles:
                 style_t.append(
-                    truncation_latent + truncation * (style - truncation_latent)
+                    truncation_latent + truncation * (style - truncation_latent) # 애초에 truncation trick이 w' = w_mean + psi(w-w_mean) 으로 정의되네.
                 )
 
             styles = style_t
@@ -689,6 +704,9 @@ class Discriminator(nn.Module):
 
 
 class MyConv2d(nn.Module):
+    """
+    ModulatedConv2d와는 다르게 여기선 modulation & demodulation을 사용하지 않음. -> 근데 얘는 애초에 사용이 안되는데?
+    """
     def __init__(
         self,
         in_channel,
