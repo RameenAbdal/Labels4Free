@@ -58,7 +58,7 @@ def accumulate(model1, model2, decay=0.999):
     par2 = dict(model2.named_parameters())
 
     for k in par1.keys():
-        """parameter를 이런 식으로 해주는 건 대체 어디서 나온 걸까? -> 뒤에 이 함수 참조한 코드 보기"""
+        """parameter를 이런 식으로 해주는 건 대체 어디서 나온 걸까? -> weight ema"""
         par1[k].data.mul_(decay).add_(par2[k].data, alpha=1 - decay)
 
 # regularization 부분은 PertSeg paper에서 따온 아이디어였음.
@@ -130,6 +130,10 @@ def set_grad_none(model, targets): # 특정 parameter만 grad를 none으로
     for n, p in model.named_parameters():
         if n in targets:
             p.grad = None
+
+def expand_path(path):
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim, ema_bg, device, mean_latent):
@@ -243,7 +247,6 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
     
         with torch.no_grad():
          fake_img, _ = generator(noise, back=False, truncation=args.trunc, truncation_latent=mean_latent)
- 
          fake_img2, x = generator(noise,  back=True)
 
         alpha_mask = bg_extractor(_)
@@ -303,7 +306,7 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
                         f"sample/{str(i).zfill(6)}_composite.png",
                         nrow=int(args.n_sample ** 0.5),
                         normalize=True,
-                        range=(-1, 1),
+                        value_range=(-1, 1),
                     )
                     utils.save_image(
                         alpha_mask,
@@ -317,14 +320,14 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
                         f"sample/{str(i).zfill(6)}_original.png",
                         nrow=int(args.n_sample ** 0.5),
                         normalize=True,
-                        range=(-1, 1),
+                        value_range=(-1, 1),
                     )
                     utils.save_image(
                         sample_bg,
                         f"sample/{str(i).zfill(6)}_background.png",
                         nrow=int(args.n_sample ** 0.5),
                         normalize=True,
-                        range=(-1, 1),
+                        value_range=(-1, 1),
                     )
 
                 
@@ -371,6 +374,9 @@ if __name__ == "__main__":
         "--use_disc", action="store_true", help="use pretrained discriminator"
     )
     parser.add_argument(
+        "--pretrained_alphanet", action="store_true", help="use pretrained alpha network"
+    )
+    parser.add_argument(
         "--r1", type=float, default=10, help="weight of the r1 regularization"
     )
     parser.add_argument(
@@ -414,7 +420,7 @@ if __name__ == "__main__":
         "--ckpt",
         type=str,
         default=None,
-        help="path to the checkpoints to resume training",
+        help="path to the checkpoints to resume training (checkpoints should be in the format of pytorch)",
     )
     parser.add_argument("--lr", type=float, default=0.0002, help="learning rate")
     parser.add_argument(
@@ -462,8 +468,6 @@ if __name__ == "__main__":
     n_gpu = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
     args.distributed = n_gpu > 1
 
-    print(args.distributed)
-    
     if args.distributed:
         torch.cuda.set_device(args.local_rank)
         torch.distributed.init_process_group(backend="nccl", init_method="env://")
@@ -529,12 +533,27 @@ if __name__ == "__main__":
 
         except ValueError:
             pass
+        
+        try:
+            generator.load_state_dict(ckpt['g_ema'])
+            g_ema.load_state_dict(ckpt['g_ema'])
+        
+        except:
+            generator.load_state_dict(ckpt['g'])
+            g_ema.load_state_dict(ckpt['g'])
+        
+        print("Generator Loaded.")
 
-        generator.load_state_dict(ckpt['g_ema'])
-        g_ema.load_state_dict(ckpt['g_ema'])
-        if args.use_disc: 
-           
+        if args.use_disc:   
             discriminator.load_state_dict(ckpt['d'])
+            print("Discriminator Loaded.")
+
+        if args.pretrained_alphanet:
+            alphanet_model.load_state_dict(ckpt['bg_extractor_ema'])
+            ema_bg.load_state_dict(ckpt['bg_extractor_ema'])
+            print("AlphaNet Loaded.")
+        
+        print("Model successfully loaded!")
        
 
     with torch.no_grad():
@@ -566,21 +585,26 @@ if __name__ == "__main__":
         )
 
     transform = transforms.Compose(
-        [
+        [   
+            transforms.Resize((args.size, args.size)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True),
         ]
     )
+    print("Building Dataset...")
     dataset = MultiResolutionDataset(args.path, transform, args.size)
+    print("Dataset Built!")
+
     loader = data.DataLoader(
         dataset,
         batch_size=args.batch,
         sampler=data_sampler(dataset, shuffle=True, distributed=args.distributed),
         drop_last=True,
+        pin_memory=True
     )
 
     if get_rank() == 0 and wandb is not None and args.wandb:
-        wandb.init(project="stylegan 2")
+        wandb.init(project="labels4free", name=args.run_name, entity="yoojlee", config=vars(args))
 
     train(args, loader, generator, alphanet_model, discriminator, g_optim, d_optim, ema_bg, device, mean_latent)

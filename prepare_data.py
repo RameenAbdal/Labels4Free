@@ -9,6 +9,7 @@ from tqdm import tqdm
 from torchvision import datasets
 from torchvision.transforms import functional as trans_fn
 
+# convert dataset into a format of lmdb. (jpeg 등의 이미지 파일로 되어 있는 데이터셋을 lmdb 데이터셋으로)
 
 def resize_and_convert(img, size, resample, quality=100):
     img = trans_fn.resize(img, size, resample)
