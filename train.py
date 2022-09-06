@@ -132,7 +132,8 @@ def set_grad_none(model, targets): # 특정 parameter만 grad를 none으로
             p.grad = None
 
 def expand_path(path):
-    os.makedirs(path, exist_ok=True)
+    core_path = "/".join(path.split("/")[:-1])
+    os.makedirs(core_path, exist_ok=True)
     return path
 
 
@@ -303,28 +304,28 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
                     image_new = sample * alpha_mask + (1 - alpha_mask) * sample_bg
                     utils.save_image(
                         image_new,
-                        f"sample/{str(i).zfill(6)}_composite.png",
+                        expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_composite.png"),
                         nrow=int(args.n_sample ** 0.5),
                         normalize=True,
                         value_range=(-1, 1),
                     )
                     utils.save_image(
                         alpha_mask,
-                        f"sample/{str(i).zfill(6)}_alpha_mask.png",
+                        expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_alpha_mask.png"),
                         nrow=int(args.n_sample ** 0.5),
                         normalize=False,
                     )
 
                     utils.save_image(
                         sample,
-                        f"sample/{str(i).zfill(6)}_original.png",
+                        expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_original.png"),
                         nrow=int(args.n_sample ** 0.5),
                         normalize=True,
                         value_range=(-1, 1),
                     )
                     utils.save_image(
                         sample_bg,
-                        f"sample/{str(i).zfill(6)}_background.png",
+                        expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_background.png"),
                         nrow=int(args.n_sample ** 0.5),
                         normalize=True,
                         value_range=(-1, 1),
@@ -342,7 +343,7 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
                         "args": args,
                         "ada_aug_p": ada_aug_p,
                      },
-                    f"checkpoint/{str(i).zfill(6)}.pt",
+                    expand_path(f"checkpoint/{args.run_name}/{str(i).zfill(6)}.pt"),
                 )
 
 
@@ -433,6 +434,9 @@ if __name__ == "__main__":
         "--wandb", action="store_true", help="use weights and biases logging"
     )
     parser.add_argument(
+        "--run_name", type=str, default="exp1", help="run name for wandb"
+    )
+    parser.add_argument(
         "--local_rank", type=int, default=0, help="local rank for distributed training"
     )
     parser.add_argument(
@@ -461,7 +465,7 @@ if __name__ == "__main__":
         type=int,
         default=256,
         help="probability update interval of the adaptive augmentation",
-    )
+    )    
 
     args = parser.parse_args()
 
@@ -534,11 +538,11 @@ if __name__ == "__main__":
         except ValueError:
             pass
         
-        try:
+        try: # stylegan2 state_dict
             generator.load_state_dict(ckpt['g_ema'])
             g_ema.load_state_dict(ckpt['g_ema'])
         
-        except:
+        except: # state dict from labels4free
             generator.load_state_dict(ckpt['g'])
             g_ema.load_state_dict(ckpt['g'])
         
