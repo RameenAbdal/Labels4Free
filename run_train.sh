@@ -1,1 +1,1 @@
-python train.py --size 512 car --batch 2 --n_sample 8 --ckpt stylegan2-car-config-f.pkl --loss_multiplier 10 --iter 50 --trunc 0.3 --lr 0.002 --sat_weight 1.0 --model_save_freq 25 --reproduce_model --use_disc
+python train.py --size 512 ./car/ --batch 4 --n_sample 8 --ckpt /home/workspace/Labels4Free/LSUN_Car.pt --loss_multiplier 20 --bg_coverage_wt 30 --iter 500 --trunc 0.3 --lr 0.002 --sat_weight 1.0 --model_save_freq 25 --reproduce_model --pretrained_alphanet --run_name no_pretrained_alpha --wandb
