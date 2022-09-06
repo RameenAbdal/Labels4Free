@@ -293,7 +293,7 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
                     }
                 )
 
-            if i % args.model_save_freq == 0:
+            if (i+1) % args.model_save_freq == 0:
                 with torch.no_grad():
                     g_ema.eval()
                     sample, _ = g_ema([sample_z], truncation=0.5, truncation_latent=mean_latent, back = False)
@@ -302,34 +302,46 @@ def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim
                     alpha_mask = bg_extractor(_)
     
                     image_new = sample * alpha_mask + (1 - alpha_mask) * sample_bg
-                    utils.save_image(
-                        image_new,
-                        expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_composite.png"),
-                        nrow=int(args.n_sample ** 0.5),
-                        normalize=True,
-                        value_range=(-1, 1),
-                    )
-                    utils.save_image(
-                        alpha_mask,
-                        expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_alpha_mask.png"),
-                        nrow=int(args.n_sample ** 0.5),
-                        normalize=False,
-                    )
 
-                    utils.save_image(
-                        sample,
-                        expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_original.png"),
-                        nrow=int(args.n_sample ** 0.5),
-                        normalize=True,
-                        value_range=(-1, 1),
-                    )
-                    utils.save_image(
-                        sample_bg,
-                        expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_background.png"),
-                        nrow=int(args.n_sample ** 0.5),
-                        normalize=True,
-                        value_range=(-1, 1),
-                    )
+                    if args.save_image:
+                        utils.save_image(
+                            image_new,
+                            expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_composite.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            value_range=(-1, 1),
+                        )
+                        utils.save_image(
+                            alpha_mask,
+                            expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_alpha_mask.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=False,
+                        )
+
+                        utils.save_image(
+                            sample,
+                            expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_original.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            value_range=(-1, 1),
+                        )
+                        utils.save_image(
+                            sample_bg,
+                            expand_path(f"sample/{args.run_name}/{str(i).zfill(6)}_background.png"),
+                            nrow=int(args.n_sample ** 0.5),
+                            normalize=True,
+                            value_range=(-1, 1),
+                        )
+                    
+                    if wandb and args.wandb:
+                        wandb.log(
+                            {
+                                "Composite": wandb.Image(utils.make_grid(image_new, nrow=int(args.n_sample ** 0.5), normalize=True, value_range=(-1, 1)).permute(1,2,0).cpu().numpy()),
+                                "Alpha Mask": wandb.Image(utils.make_grid(alpha_mask, nrow=int(args.n_sample ** 0.5), normalize=False).permute(1,2,0).cpu().numpy()),
+                                "Original Sample": wandb.Image(utils.make_grid(sample, nrow=int(args.n_sample ** 0.5), normalize=True, value_range=(-1, 1)).permute(1,2,0).cpu().numpy()),
+                                "Generated Background": wandb.Image(utils.make_grid(sample_bg, nrow=int(args.n_sample ** 0.5), normalize=True, value_range=(-1, 1)).permute(1,2,0).cpu().numpy())
+                            }
+                        )
 
                 
                     torch.save(
@@ -435,6 +447,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--run_name", type=str, default="exp1", help="run name for wandb"
+    )
+    parser.add_argument(
+        "--save_image", action="store_true", help="whether to save images as well when saving models"
     )
     parser.add_argument(
         "--local_rank", type=int, default=0, help="local rank for distributed training"
