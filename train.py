@@ -136,6 +136,19 @@ def expand_path(path):
     os.makedirs(core_path, exist_ok=True)
     return path
 
+def fix_seed(random_seed):
+    """
+    fix seed to control any randomness from a code 
+    (enable stability of the experiments' results.)
+    """
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed)  # if use multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(random_seed)
+    random.seed(random_seed)
+
 
 def train(args, loader, generator, bg_extractor, discriminator, g_optim, d_optim, ema_bg, device, mean_latent):
     """
@@ -481,8 +494,14 @@ if __name__ == "__main__":
         default=256,
         help="probability update interval of the adaptive augmentation",
     )    
+    parser.add_argument(
+        "--random_seed",
+        type=int, default=0, help="Random Seed for reproducibility"
+    )
 
     args = parser.parse_args()
+
+    fix_seed(args.random_seed)
 
     n_gpu = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
     args.distributed = n_gpu > 1

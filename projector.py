@@ -1,6 +1,6 @@
 import argparse
 import math
-import os
+import os, glob
 
 import torch
 from torch import optim
@@ -119,6 +119,7 @@ if __name__ == "__main__":
         action="store_true",
         help="allow to use distinct latent codes to each layers",
     )
+    parser.add_argument("--save_dir", type=str, default="test/proj_results")
     parser.add_argument(
         "files", metavar="FILES", nargs="+", help="path to image files to be projected"
     )
@@ -138,9 +139,12 @@ if __name__ == "__main__":
         ]
     )
 
-    imgs = []
+    file_list, imgs = [], []
 
-    for imgfile in args.files:
+    for path in args.files:
+        file_list.extend(glob.glob(path+"/*.jpg"))
+
+    for imgfile in file_list:
         img = transform(Image.open(imgfile).convert("RGB"))
         imgs.append(img)
 
@@ -158,9 +162,9 @@ if __name__ == "__main__":
         latent_mean = latent_out.mean(0)
         latent_std = ((latent_out - latent_mean).pow(2).sum() / n_mean_latent) ** 0.5
 
-    percept = lpips.PerceptualLoss(
-        model="net-lin", net="vgg", use_gpu=device.startswith("cuda")
-    )
+    percept = lpips.LPIPS(
+        net="vgg"
+    ).to(device)
 
     noises_single = g_ema.make_noise()
     noises = []
@@ -225,12 +229,12 @@ if __name__ == "__main__":
 
     img_gen, _ = g_ema([latent_path[-1]], input_is_latent=True, noise=noises)
 
-    filename = os.path.splitext(os.path.basename(args.files[0]))[0] + ".pt"
+    filename = os.path.join(args.save_dir, os.path.splitext(os.path.basename(args.files[0]))[0] + ".pt")
 
     img_ar = make_image(img_gen)
 
     result_file = {}
-    for i, input_name in enumerate(args.files):
+    for i, input_name in enumerate(file_list):
         noise_single = []
         for noise in noises:
             noise_single.append(noise[i : i + 1])
@@ -239,10 +243,10 @@ if __name__ == "__main__":
             "img": img_gen[i],
             "latent": latent_in[i],
             "noise": noise_single,
-        }
+        } # 애초에 경로 내에 여러 test 이미지가 있을 경우에 하나의 pt 파일에 저장되는 형식인 듯? 그건 참 좋다.
 
         img_name = os.path.splitext(os.path.basename(input_name))[0] + "-project.png"
         pil_img = Image.fromarray(img_ar[i])
-        pil_img.save(img_name)
+        pil_img.save(os.path.join(args.save_dir, img_name))
 
     torch.save(result_file, filename)

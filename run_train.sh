@@ -1,1 +1,1 @@
-python train.py --size 512 ./car/ --batch 4 --n_sample 8 --ckpt checkpoint/LSUN_Car.pt --loss_multiplier 20 --bg_coverage_wt 15 --iter 250 --trunc 0.3 --lr 0.002 --sat_weight 1.0 --model_save_freq 25 --reproduce_model --run_name bg_15 --wandb
+python train.py --size 512 ./car/ --batch 4 --n_sample 8 --ckpt checkpoint/LSUN_Car.pt --loss_multiplier 20 --bg_coverage_wt 10 --iter 250 --trunc 0.3 --lr 0.002 --sat_weight 1.0 --model_save_freq 25 --reproduce_model --run_name bg_10 --wandb
