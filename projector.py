@@ -142,7 +142,11 @@ if __name__ == "__main__":
     file_list, imgs = [], []
 
     for path in args.files:
-        file_list.extend(glob.glob(path+"/*.jpg"))
+        if 'jpg' not in path:
+            file_list.extend(glob.glob(path+"/*.jpg"))
+        else:
+            file_list = args.files
+            break
 
     for imgfile in file_list:
         img = transform(Image.open(imgfile).convert("RGB"))

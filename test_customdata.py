@@ -1,3 +1,6 @@
+"""
+Evaluation metrics 값 계산해서 평가
+"""
 import argparse
 from tqdm import tqdm
 from PIL import Image

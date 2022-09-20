@@ -495,6 +495,9 @@ class Generator(nn.Module):
     ):
         if not input_is_latent:
             styles = [self.style(s) for s in styles]
+            # 두 가지로 나뉘게 되는 거. 
+            # 1) input으로 latent가 들어가게 되는 경우
+            # 2) 그냥 random noise가 input으로 들어가게 되는 경우 -> 이렇게 될 경우에는 sample code를 그냥 통과시켜주는 거임.
 
         if noise is None:
             if randomize_noise:
