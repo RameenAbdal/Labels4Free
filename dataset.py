@@ -1,10 +1,12 @@
-import os
+import os, glob
 import pickle
+import math
 from io import BytesIO
 
 import lmdb
 from PIL import Image
 from torch.utils.data import Dataset
+from torchvision import transforms
 
 # (original) prepare_data를 통해 lmdb key값을 어느 정도 맞춰놓음. -> 해당 부분 수정
 class MultiResolutionDataset(Dataset):
@@ -54,3 +56,48 @@ class MultiResolutionDataset(Dataset):
             img = self.transform(img)
 
         return img
+
+class TestDataset(Dataset):
+    def __init__(self, root, transform):
+        super().__init__()
+
+        self.file_list = sorted(glob.glob(root+"/*.jpg"))
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.file_list)
+
+    def __getitem__(self, index):
+        img = Image.open(self.file_list[index]).convert("RGB")
+
+        if self.transform:
+            img = self.transform(img)
+        
+        return img
+
+class PadTransform(object):
+    def __init__(self, resize):
+        self.resize = resize
+
+    def __call__(self, img): # img: PIL Image
+        w,h = img.width, img.height
+
+        if h > w:
+            resize = (self.resize, round(self.resize*w/h))
+            padding = (round(self.resize*(1-w/h)/2), 0) # rounding error 때문에 발생하는 padding 값 에러 확인할 것.
+        
+        else:
+            resize = (round(self.resize*h/w), self.resize)
+            padding = (0,round(self.resize*(1-h/w)/2))
+        
+
+        transform = transforms.Compose(
+            [
+                transforms.Resize(resize),
+                transforms.Pad(padding),
+                transforms.Resize((self.resize, self.resize)), # to ensure that transformed image has a given shape.
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+            ]
+        )
+        return transform(img)
