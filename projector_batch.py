@@ -16,6 +16,7 @@ from model_new import Generator
 from dataset import TestDataset, PadTransform
 from torch.utils.data import DataLoader
 
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 def noise_regularize(noises):
     loss = 0
@@ -90,7 +91,6 @@ def fix_seed(random_seed):
 
 
 if __name__ == "__main__":
-    device = "cuda"
 
     parser = argparse.ArgumentParser(
         description="Image projector to the generator latent spaces"
@@ -144,9 +144,14 @@ if __name__ == "__main__":
         "--root", type=str, default="/home/data/Labels4Free/top148"
     )
 
+    parser.add_argument("--seed", type=int, default=0, help="Random Seed for reproducibility")
+    parser.add_argument("--gpu_id", type=int, default=-1, help="gpu device id")
+
     args = parser.parse_args()
 
-    fix_seed(0)
+    device = f"cuda:{args.gpu_id}" if args.gpu_id != -1 else 'cpu'
+    print(device)
+    fix_seed(args.seed)
 
     n_mean_latent = 10000
 
