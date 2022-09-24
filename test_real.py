@@ -13,6 +13,9 @@ import torch
 from torchvision import utils
 from model_new import *
 from tqdm import tqdm
+from PIL import Image
+
+from dataset import PadTransform
 
 MIN_RES = {1024:32, 512:16, 256:8}
 N_MEAN_LATENT = 10000
@@ -56,6 +59,8 @@ def generate_mask(opt):
     """
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
+    transform = PadTransform(opt.size)
+
     # 일단 loop을 돌면서 latent와 path를 가져와야함.
     # load model
     g_ema = Generator(
@@ -96,8 +101,10 @@ def generate_mask(opt):
 
             alpha_mask = bg_extractor_(_)
             hard_mask = (alpha_mask > opt.th).float()
-
-            image_new = img_gen * alpha_mask + (1-alpha_mask) * torch.zeros(img_gen.shape).to(device)
+            
+            alpha_mask = alpha_mask.detach().clone().cpu()
+            image_org = transform(Image.open(list(ckpt.keys())[i])).unsqueeze(0)
+            image_new = image_org * hard_mask.cpu()
             image_new = image_new.detach().clone().cpu()
 
             utils.save_image(
@@ -105,29 +112,8 @@ def generate_mask(opt):
                             f"{opt.save_dir}/{str(i).zfill(6)}_composite.png",
                             nrow=int(opt.batch ** 0.5),
                             normalize=True,
-                            value_range=(-1, 1),
+                            value_range=(-1,1)
                         )
-            utils.save_image(
-                            alpha_mask,
-                            f"{opt.save_dir}/{str(i).zfill(6)}_alpha_mask.png",
-                            nrow=int(opt.batch ** 0.5),
-                            normalize=False,
-                        )
-
-            utils.save_image(
-                            img_gen,
-                            f"{opt.save_dir}/{str(i).zfill(6)}_original.png",
-                            nrow=int(opt.batch ** 0.5),
-                            normalize=True,
-                            value_range=(-1, 1),
-                        )
-            
-            utils.save_image(
-                        hard_mask,
-                        f"{opt.save_dir}/{str(i).zfill(6)}_hard_mask.png",
-                        nrow=int(opt.batch ** 0.5),
-                        normalize=False
-                    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Segmentation on Real Images")
@@ -142,11 +128,13 @@ if __name__ == "__main__":
     parser.add_argument("--noise", type=float, default=0.05)
     parser.add_argument("--noise_ramp", type=float, default=0.75)
     parser.add_argument("--ckpt_generator", type=str, default="/home/data/Labels4Free/checkpoint/stylegan2-car-config-f.pt")
-    parser.add_argument("--ckpt_bg_extractor", type=str, default="/home/data/Labels4Free/checkpoint/bg_10/000174.pt")
+    parser.add_argument("--ckpt_bg_extractor", type=str, default="/home/data/Labels4Free/checkpoint/bg_coverage_wt_15/000175.pt")
     parser.add_argument("--th", type=float, default=0.9)
     parser.add_argument("--fuse_noise", action="store_true")
     
     opt = parser.parse_args()
-
+    sub_dir = opt.ckpt_path.split("/")[-1].replace(".pt", "")
+    
+    opt.save_dir = os.path.join(opt.save_dir, sub_dir)
     os.makedirs(opt.save_dir, exist_ok=True) # increment_path로 확장시켜두기
     generate_mask(opt)
