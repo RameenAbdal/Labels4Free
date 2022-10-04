@@ -61,7 +61,7 @@ class TestDataset(Dataset):
     def __init__(self, root, transform):
         super().__init__()
 
-        self.file_list = sorted(glob.glob(root+"/*.jpg"))
+        self.file_list = sorted(glob.glob(root+"/*.jpg")+glob.glob(root+"/*.jfif")+glob.glob(root+"/*.png"))
         self.transform = transform
 
     def __len__(self):

@@ -99,7 +99,7 @@ if __name__ == "__main__":
         "--batch", type=int, required=True
     )
     parser.add_argument(
-        "--ckpt", type=str, default="/home/data/Labels4Free/checkpoint/stylegan2-car-config-f.pt", help="path to the model checkpoint"
+        "--ckpt", type=str, default="checkpoint/stylegan2-car-config-f.pt", help="path to the model checkpoint"
     )
     parser.add_argument(
         "--size", type=int, default=256, help="output image sizes of the generator"
@@ -150,6 +150,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     device = f"cuda:{args.gpu_id}" if args.gpu_id != -1 else 'cpu'
+    if args.gpu_id != -1:
+        torch.cuda.set_device(device)
     print(device)
     fix_seed(args.seed)
 
