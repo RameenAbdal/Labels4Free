@@ -57,7 +57,10 @@ def generate_mask(opt):
 
     evaluation하려면 뭐가 필요하냐? 일단은 모델을 불러와야지.
     """
-    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    device = f'cuda:{opt.gpu_id}' if torch.cuda.is_available() else 'cpu'
+    if opt.gpu_id != -1:
+        torch.cuda.set_device(device)
+    print(device)
 
     transform = PadTransform(opt.size)
 
@@ -115,6 +118,22 @@ def generate_mask(opt):
                             value_range=(-1,1)
                         )
 
+            utils.save_image(
+                            image_org,
+                            f"{opt.save_dir}/{str(i).zfill(6)}_origin.png",
+                            nrow=int(opt.batch ** 0.5),
+                            normalize=True,
+                            value_range=(-1,1)
+                        )
+
+            utils.save_image(
+                            img_gen,
+                            f"{opt.save_dir}/{str(i).zfill(6)}_gen.png",
+                            nrow=int(opt.batch ** 0.5),
+                            normalize=True,
+                            value_range=(-1,1)
+                        )    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Segmentation on Real Images")
 
@@ -127,10 +146,11 @@ if __name__ == "__main__":
     parser.add_argument("--channel_multiplier", type=int, default=2)
     parser.add_argument("--noise", type=float, default=0.05)
     parser.add_argument("--noise_ramp", type=float, default=0.75)
-    parser.add_argument("--ckpt_generator", type=str, default="/home/data/Labels4Free/checkpoint/stylegan2-car-config-f.pt")
-    parser.add_argument("--ckpt_bg_extractor", type=str, default="/home/data/Labels4Free/checkpoint/bg_coverage_wt_15/000175.pt")
+    parser.add_argument("--ckpt_generator", type=str, default="./checkpoint/stylegan2-car-config-f.pt")
+    parser.add_argument("--ckpt_bg_extractor", type=str, default="./checkpoint/bg_coverage_wt_15/000175.pt")
     parser.add_argument("--th", type=float, default=0.9)
     parser.add_argument("--fuse_noise", action="store_true")
+    parser.add_argument("--gpu_id", type=int, default=-1, help="gpu device id")
     
     opt = parser.parse_args()
     sub_dir = opt.ckpt_path.split("/")[-1].replace(".pt", "")
