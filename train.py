@@ -19,7 +19,7 @@ except ImportError:
     wandb = None
 
 from model_new import Generator, Discriminator, bg_extractor_repro, bg_extractor
-from dataset import MultiResolutionDataset
+from dataset import MultiResolutionDataset, TestDataset
 from distributed import (
     get_rank,
     synchronize,
@@ -378,6 +378,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="StyleGAN2 Alpha Network trainer")
 
     parser.add_argument("path", type=str, help="path to the lmdb dataset")
+    parser.add_argument("--use_lmdb", action="store_true", help="flag of whether to use lmdb dataset or not")
     parser.add_argument(
         "--iter", type=int, default=1001, help="total training iterations"
     )
@@ -548,7 +549,7 @@ if __name__ == "__main__":
 
     g_reg_ratio = args.g_reg_every / (args.g_reg_every + 1)
     d_reg_ratio = args.d_reg_every / (args.d_reg_every + 1)
-    parm_ =  list(alphanet_model.parameters())
+    parm_ =  list(alphanet_model.parameters()) # 왜 굳이 list로 해서 넣어줄까..?
     g_optim = optim.Adam(
         parm_,
         lr=args.lr * g_reg_ratio,
@@ -630,8 +631,12 @@ if __name__ == "__main__":
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True),
         ]
     )
+
     print("Building Dataset...")
-    dataset = MultiResolutionDataset(args.path, transform, args.size)
+    if args.use_lmdb:
+        dataset = MultiResolutionDataset(args.path, transform, args.size)
+    else:
+        dataset = TestDataset(args.path, transform)
     print("Dataset Built!")
 
     loader = data.DataLoader(
