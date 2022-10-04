@@ -814,11 +814,12 @@ class bg_extractor_repro(nn.Module):
         if self.image_size == 1024:
              self.tensor_resolutions = [ 512, 512, 512, 512, 256, 256,  128, 128, 64, 64, 32, 32]
 
-        elif self.image_size == 512:
+        # elif self.image_size == 512:
+        else:
             self.tensor_resolutions = [ 512,  512,  512, 512,  512,  512,  256, 256, 128, 128, 64, 64 ]
 
-        else:
-             self.tensor_resolutions = [ 512, 512,  512,  512, 512, 512,  512,  512,  256, 256, 128, 128]
+        # else:
+        #      self.tensor_resolutions = [ 512, 512,  512,  512, 512, 512,  512,  512,  256, 256, 128, 128]
 
         self.image_resolutions = [ 16, 32, 64, 128, 256, 512, 1024]
         
@@ -889,7 +890,9 @@ class bg_extractor(nn.Module):
             self.tensor_resolutions = [ 512,  512,  512,  256,  128,  64]
 
         else:
-            self.tensor_resolutions = [ 512, 512,  512,  512,  256,  128]
+            # self.tensor_resolutions = [ 512, 512,  512,  512,  256,  128] -> 이렇게 하면 에러 남.. (@ 256)
+            self.tensor_resolutions = [ 512, 512,  512,  256,  128,  64]
+
 
         self.upsample_fns = [nn.Upsample(size=(res, res), mode='bicubic', align_corners=True) for res in self.image_resolutions if res >= min_res*2]
         self.upsample_fns = nn.ModuleList(self.upsample_fns)
